@@ -4,6 +4,17 @@ from typing import Union
 from keyboard2000.app.instrument import MIDIDevice, MidiEvent, ControlEvent
 
 
+class KeyboardMap:
+    """keyboard map handler, not very formed right now, object that is able to convert specified keyboard raw input
+    onto prepared output as MidiEvent or ControlEvent objects (midi signals or device control signals like midi-channel
+    change). Also object should be able to read mapping from yaml configuration file
+    TODO: prepare tool for convenient key mapping into file"""
+
+    @abstractmethod
+    def convert_to_event(self, key_data) -> Union[MidiEvent, ControlEvent]:
+        pass
+
+
 class DeviceHandler:
     """Device Handler should handle keyboard device input as separated, non-blocking thread.
     Also it means that one keyboard device represent one instrument device.
@@ -18,14 +29,3 @@ class DeviceHandler:
     @abstractmethod
     def run(self):
         raise NotImplemented
-
-
-class KeyboardMap:
-    """keyboard map handler, not very formed right now, object that is able to convert specified keyboard raw input
-    onto prepared output as MidiEvent or ControlEvent objects (midi signals or device control signals like midi-channel
-    change). Also object should be able to read mapping from yaml configuration file
-    TODO: prepare tool for convenient key mapping into file"""
-
-    @abstractmethod
-    def convert_to_event(self, key_data) -> Union[MidiEvent, ControlEvent]:
-        pass
