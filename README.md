@@ -4,4 +4,4 @@
 
 ![application](docs/event_log.png)
 
-![patchage view](docs/event_log.png)
+![patchage view](docs/patchage.png)
