@@ -25,6 +25,7 @@ class KeyboardMap:
     onto prepared output as MidiEvent or ControlEvent objects (midi signals or device control signals like midi-channel
     change). Also object should be able to read mapping from yaml configuration file
     TODO: prepare tool for convenient key mapping into file"""
+
     @abstractmethod
     def convert_to_event(self, key_data) -> Union[MidiEvent, ControlEvent]:
         pass
