@@ -117,6 +117,9 @@ if __name__ == '__main__':
                     midi_sockets[event['socket']].write_midi_event(
                         event['event'][0], event['event'][1]
                     )
+                    print('%s: sent midi event: %3d %3d %3d' % (
+                        event['socket'], event['event'][1][0], event['event'][1][1], event['event'][1][2],
+                    ))
                     # for dev, socket in midi_sockets.items():
                     #     socket.write_midi_event(
                     #         event['event'][0], event['event'][1]
@@ -125,9 +128,6 @@ if __name__ == '__main__':
                 #     event['socket'].write_midi_event(
                 #         event['event'][0], event['event'][1]
                 #     )
-                print('Sent midi event: %3d %3d %3d' % (
-                    event['event'][1][0], event['event'][1][1], event['event'][1][2],
-                ))
 
 
     client = jack.Client("keyboard2000")
