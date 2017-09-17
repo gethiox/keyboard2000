@@ -1,6 +1,6 @@
 import yaml
 
-from keyboard2000.app.instrument import MIDIDevice, MidiEvent
+from keyboard2000.app.instrument import MIDIDevice, MidiEvent, ControlEvent, Ctrl
 from keyboard2000.domain.input import DeviceHandler, KeyboardMap
 
 
@@ -40,6 +40,7 @@ class LinuxHandler(DeviceHandler):
                     segment = [device.read(8), device.read(8), device.read(8)]
 
                 for key in collected_events:
+                    # print('pressed key %s' % key[0])
                     self.instrument.handle_event(self.kbd_map.convert_to_event(key))
                     # self.events_queue.put([key['key'], key['status']])
         except Exception as err:
@@ -57,12 +58,17 @@ class LinuxKeyboardMap(KeyboardMap):
 
     def convert_to_event(self, key_data):
         if key_data[0] in self.dict_map:
-            return MidiEvent(
-                note=self.dict_map[key_data[0]],
-                pressed_down=not key_data[1],
-            )
-        else:
-            pass
+            mapped = self.dict_map[key_data[0]]
+            if isinstance(mapped, int):
+                return MidiEvent(
+                    note=mapped,
+                    pressed_down=not key_data[1],
+                )
+            elif isinstance(mapped, str):
+                return ControlEvent(
+                    code=getattr(Ctrl, mapped),
+                    pressed_down=not key_data[1],
+                )
 
 
 class LinuxEventDevice:
