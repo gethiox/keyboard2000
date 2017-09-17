@@ -16,6 +16,7 @@ class Ctrl:
     octave_add = 8
     octave_del = 9
     panic = 10
+    reset = 11
 
 
 def note_on(channel: int, note: int, velocity: int = 127):
@@ -154,9 +155,18 @@ class MIDIDevice:
                 print('program up, %s program' % self.channel)
             else:
                 print('program set to 127, no higher is possible')
+
         elif event.code == Ctrl.panic and event.pressed_down:
             self._send_event((0, panic()))
             print('panic!')
+
+        elif event.code == Ctrl.reset and event.pressed_down:
+            print('reset')
+            self.octaves = 0
+            self.semitones = 0
+            self.addition_octaves = 0
+            self.channel = 1
+            self.programm = 0
 
     def _send_event(self, event):
         self.event_queue.put({
