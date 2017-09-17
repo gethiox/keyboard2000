@@ -63,14 +63,11 @@ class DevicesWatcher:
                         device_path='/dev/input/' + device['event'],
                     )
 
+                    time.sleep(0.1)
                     capture_thread = Thread(target=dev_handler.run)
                     capture_thread.start()
-                    # events_thread = Thread(target=dev_handler.handle_event, args=(capture_thread,))
-                    # events_thread.start()
 
                     self.devices.update({device['event']: {'capture': capture_thread}})
-                    # self.devices.update({device['event']: {'capture': capture_thread,
-                    #                                        'events': events_thread}})
 
                     timestamp = get_timestamp()
                     print('%s: opened midi port: %s' % (timestamp,
@@ -78,13 +75,11 @@ class DevicesWatcher:
 
             devices_to_remove = []
             for event, threads in self.devices.items():
-                # if not any([threads['capture'].is_alive(),
-                #             threads['events'].is_alive()]):
-                if not any([threads['capture'].is_alive()]):
+                if not threads['capture'].is_alive():
                     devices_to_remove.append(event)
 
             for event in devices_to_remove:
-                event_name = self.midi_sockets[event].name.split(':')[1]
+                event_name = self.midi_sockets[event]
                 self.midi_sockets[event].unregister()
                 self.midi_sockets.pop(event)
 
@@ -120,14 +115,6 @@ if __name__ == '__main__':
                     print('%s: sent midi event: %3d %3d %3d' % (
                         event['socket'], event['event'][1][0], event['event'][1][1], event['event'][1][2],
                     ))
-                    # for dev, socket in midi_sockets.items():
-                    #     socket.write_midi_event(
-                    #         event['event'][0], event['event'][1]
-                    #     )
-                # else:
-                #     event['socket'].write_midi_event(
-                #         event['event'][0], event['event'][1]
-                #     )
 
 
     client = jack.Client("keyboard2000")
