@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import argparse
 import datetime
 import logging
 import os
@@ -46,12 +47,22 @@ def get_devices():
 
 
 class DevicesWatcher:
-    def __init__(self, midi_sockets, events_queue: Queue, signal_queue: threading.Event, map_directory: str = './maps'):
+    """
+    class is responsible for detecting new keyboard devices and enabling them
+    """
+
+    def __init__(self, midi_sockets, events_queue: Queue, signal_queue: threading.Event, map_directory: str = None):
         self.devices = {}
         self.midi_sockets = midi_sockets
         self.events_queue = events_queue
         self.signal_queue = signal_queue
-        self.map_direcotry = map_directory
+        if map_directory is None:
+            self.map_direcotry = os.path.join(
+                os.path.dirname(os.path.abspath(__file__)),
+                'maps/'
+            )
+        else:
+            self.map_direcotry = map_directory
 
     def run(self):
         while True:
