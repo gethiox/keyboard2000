@@ -1,7 +1,7 @@
 from abc import abstractmethod
 from typing import Union
 
-from keyboard2000.app.instrument import MIDIDevice, MidiEvent, ControlEvent
+from keyboard2000.app.instrument import MIDIDevice, NoteEvent, ControlEvent
 
 
 class KeyboardMap:
@@ -11,7 +11,7 @@ class KeyboardMap:
     TODO: prepare tool for convenient key mapping into file"""
 
     @abstractmethod
-    def convert_to_event(self, key_data) -> Union[MidiEvent, ControlEvent]:
+    def convert_to_event(self, key_data) -> Union[NoteEvent, ControlEvent]:
         pass
 
 

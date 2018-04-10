@@ -1,4 +1,6 @@
+import logging
 from multiprocessing import Queue
+from random import randint
 from typing import Union
 
 from jack import OwnMidiPort
@@ -49,16 +51,27 @@ def panic():
     return 176, 123, 0
 
 
-class MidiEvent:
+class NoteEvent:
     def __init__(self, note: int, pressed_down: bool):
         self.note = note
         self.pressed_down = pressed_down
 
+    def __repr__(self):
+        return "<NoteEvent, note: '{note}', state: '{state}'>".format(
+            note=self.note, state='pressed' if self.pressed_down else 'released'
+        )
+
 
 class ControlEvent:
-    def __init__(self, code: int, pressed_down: bool):
+    def __init__(self, code: int, code_name: str, pressed_down: bool):
         self.code = code
+        self.code_name = code_name
         self.pressed_down = pressed_down
+
+    def __repr__(self):
+        return "ControlEvent, code: '{code}', state: '{state}'>".format(
+            code=self.code_name, state='pressed' if self.pressed_down else 'released'
+        )
 
 
 class MIDIDevice:
@@ -79,89 +92,103 @@ class MIDIDevice:
         self.channel = 1
         self.programm = 0
 
-    def handle_event(self, event: Union[MidiEvent, ControlEvent]):
-        if isinstance(event, MidiEvent):
-            self._handle_midi_event(event)
-        elif isinstance(event, ControlEvent):
-            self._handle_control_event(event)
+        self.pressed = []
 
-    def _handle_midi_event(self, event: MidiEvent):
-        if not event.pressed_down:
+    def handle_event(self, event: Union[NoteEvent, ControlEvent]):
+        if event:
+            if event.pressed_down or not event.pressed_down:
+                logging.info('HardwareEvent [%s]: %s', self.event_name, event)
+            if isinstance(event, NoteEvent):
+                self._handle_midi_event(event)
+            elif isinstance(event, ControlEvent):
+                self._handle_control_event(event)
+
+    def _handle_midi_event(self, event: NoteEvent):
+        note = event.note + self.octaves + self.semitones
+        if 0 > note or note > 127:  # note value above valid range
+            logging.warning("note above valid range (0-127 allowed, %d received)", note)
+            return
+
+        if event.pressed_down:
             midi_data = note_on(
                 channel=self.channel,
-                note=event.note + self.octaves + self.semitones,
-                # velocity=randint(64, 127)
+                note=note,
+                velocity=randint(64, 127),
             )
         else:
             midi_data = note_off(
                 channel=self.channel,
-                note=event.note + self.octaves + self.semitones
+                note=note,
             )
 
         for octave in range(0, self.addition_octaves + 1):
-            self.event_queue.put({
-                "event": (0, (midi_data[0], midi_data[1] + (12 * (octave + 1)), midi_data[2])),
-                "socket": self.event_name  # Can't put midi_socket onto Queue
-            })
+            additional_note = midi_data[1] + (12 * (octave + 1))
+            if 0 > additional_note or additional_note > 127:  # note value above valid range
+                logging.warning("note above valid range (0-127 allowed, %d received)", additional_note)
+                return
+
+            if event.pressed_down:
+                self.pressed.append(additional_note )
+            elif self.pressed:
+                try:
+                    self.pressed.remove(additional_note )
+                except ValueError:
+                    pass
+
+            if event.pressed_down or additional_note  not in self.pressed:
+                self.event_queue.put({
+                    "event": (0, (midi_data[0], additional_note , midi_data[2])),
+                    "socket": self.event_name  # Can't put midi_socket onto Queue
+                })
 
     def _handle_control_event(self, event: ControlEvent):
         if event.code == Ctrl.octave_down and event.pressed_down:
             self.octaves -= 12
             self._send_event((0, panic()))
-            print('octave down, %s semitones' % self.octaves)
         elif event.code == Ctrl.octave_up and event.pressed_down:
             self.octaves += 12
             self._send_event((0, panic()))
-            print('octave up, %s semitones' % self.octaves)
 
         elif event.code == Ctrl.semitone_down and event.pressed_down:
             self.semitones -= 1
             self._send_event((0, panic()))
-            print('semitone down, %s semitones' % self.semitones)
         elif event.code == Ctrl.semitone_up and event.pressed_down:
             self.semitones += 1
             self._send_event((0, panic()))
-            print('semitone up, %s semitones' % self.semitones)
 
-        elif event.code == Ctrl.octave_del and event.pressed_down:
+        elif event.code == Ctrl.octave_del and event.pressed_down and self.addition_octaves > 0:
             self.addition_octaves -= 1
             self._send_event((0, panic()))
-            print('remove additional ovtave, %s octaves' % self.addition_octaves)
         elif event.code == Ctrl.octave_add and event.pressed_down:
             self.addition_octaves += 1
             self._send_event((0, panic()))
-            print('add additional octave, %s octaves' % self.addition_octaves)
 
         elif event.code == Ctrl.channel_down and event.pressed_down:
             self.channel -= 1
             self._send_event((0, panic()))
-            print('channel down, %s channel' % self.channel)
+            self.pressed = []
         elif event.code == Ctrl.channel_up and event.pressed_down:
             self.channel += 1
             self._send_event((0, panic()))
-            print('channel up, %s channel' % self.channel)
+            self.pressed = []
 
         elif event.code == Ctrl.program_down and event.pressed_down:
             if self.programm > 0:
                 self.programm -= 1
                 self._send_event((0, (192, self.programm)))
-                print('program down, %s program' % self.channel)
-            else:
-                print('program set to 0, no lower is possible')
+
         elif event.code == Ctrl.program_up and event.pressed_down:
             if self.programm < 127:
                 self.programm += 1
                 self._send_event((0, (192, self.programm)))
-                print('program up, %s program' % self.channel)
             else:
-                print('program set to 127, no higher is possible')
+                pass
 
         elif event.code == Ctrl.panic and event.pressed_down:
             self._send_event((0, panic()))
-            print('panic!')
+            self.pressed = []
 
         elif event.code == Ctrl.reset and event.pressed_down:
-            print('reset')
             self.octaves = 0
             self.semitones = 0
             self.addition_octaves = 0

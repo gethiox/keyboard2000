@@ -1,15 +1,23 @@
+import logging
+import multiprocessing
+import threading
+from queue import Empty
+from typing import List
+
 import yaml
 
-from keyboard2000.app.instrument import MIDIDevice, MidiEvent, ControlEvent, Ctrl
+from keyboard2000.app.instrument import MIDIDevice, NoteEvent, ControlEvent, Ctrl
 from keyboard2000.domain.input import DeviceHandler, KeyboardMap
 
 
 class LinuxHandler(DeviceHandler):
-    def __init__(self, instrument: MIDIDevice, kbd_map: KeyboardMap, device_path: str):
+    def __init__(self, instrument: MIDIDevice, kbd_map: KeyboardMap, device_path: str,
+                 signal_queue: threading.Event):
         super().__init__(instrument, kbd_map)
         self.instrument = instrument
         self.kbd_map = kbd_map
         self.device_path = device_path
+        self.signal_queue = signal_queue
 
     def run(self):
         try:
@@ -23,6 +31,15 @@ class LinuxHandler(DeviceHandler):
 
         try:
             while True:
+                if self.signal_queue.is_set():
+                    self.instrument.handle_event(
+                        ControlEvent(code=Ctrl.panic, code_name='exit panic', pressed_down=True)
+                    )
+                    self.instrument.handle_event(
+                        ControlEvent(code=Ctrl.panic, code_name='exit panic', pressed_down=False)
+                    )
+                    return
+
                 collected_events = []
                 segment = [device.read(8), device.read(8), device.read(8)]
 
@@ -41,6 +58,7 @@ class LinuxHandler(DeviceHandler):
 
                 for key in collected_events:
                     # print('pressed key %s' % key[0])
+                    ''
                     self.instrument.handle_event(self.kbd_map.convert_to_event(key))
                     # self.events_queue.put([key['key'], key['status']])
         except Exception as err:
@@ -48,26 +66,38 @@ class LinuxHandler(DeviceHandler):
             #     dev=self.device_path,
             #     err=err)
             # )
+            logging.exception('shiet')
             device.close()
             return
 
 
 class LinuxKeyboardMap(KeyboardMap):
     def __init__(self, map_path: str):
-        self.dict_map = yaml.load(open(map_path))
+        self.dict_map_raw: dict = yaml.load(open(map_path))
+
+        self.nice_name: str = self.dict_map_raw['nice_name']
+        self.device_name: str = self.dict_map_raw['device_name']
+        self.auto_connect: List[str] = self.dict_map_raw['auto_connect']
+        self.note_map: dict = self.dict_map_raw['notes']
+        self.control_map: dict = self.dict_map_raw['control']
+
+        self.merged_map: dict = self.note_map
+        self.merged_map.update(self.control_map)
 
     def convert_to_event(self, key_data):
-        if key_data[0] in self.dict_map:
-            mapped = self.dict_map[key_data[0]]
+        if key_data[0] in self.merged_map:
+            mapped = self.merged_map[key_data[0]]
+
             if isinstance(mapped, int):
-                return MidiEvent(
+                return NoteEvent(
                     note=mapped,
-                    pressed_down=not key_data[1],
+                    pressed_down=key_data[1],
                 )
             elif isinstance(mapped, str):
                 return ControlEvent(
                     code=getattr(Ctrl, mapped),
-                    pressed_down=not key_data[1],
+                    code_name=mapped,
+                    pressed_down=key_data[1],
                 )
 
 
