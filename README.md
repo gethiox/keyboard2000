@@ -1,3 +1,5 @@
+**Deprecated, replaced with [HIDI](https://github.com/gethiox/HIDI)**
+
 ### Welcome into ultimate Keyboard2000 software project!
 
 Warning: project is still under early development!  
